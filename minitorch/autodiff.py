@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from shutil import copy
 from typing import Any, Iterable, List, Tuple
 
 from typing_extensions import Protocol
@@ -23,12 +24,18 @@ def central_difference(f: Any, *vals: Any, arg: int = 0, epsilon: float = 1e-6) 
         An approximation of $f'_i(x_0, \ldots, x_{n-1})$
     """
     # TODO: Implement for Task 1.1.
-    raise NotImplementedError("Need to implement for Task 1.1")
+    vals_plus = list(copy.deepcopy(vals))
+    vals_minus = list(copy.deepcopy(vals))
+    vals_plus[arg] += epsilon
+    vals_minus[arg] -= epsilon
+
+    return (f(*vals_plus) - f(*vals_minus)) / (2 * epsilon)
 
 
 variable_count = 1
 
-
+# Protocol是一种抽象的接口，只要实现了Protocol的所有属性和函数，那它
+# 就是这个接口的具体实现，而不需要直接继承它；Scalar就是Variable的具体实现
 class Variable(Protocol):
     def accumulate_derivative(self, x: Any) -> None:
         pass
@@ -62,7 +69,22 @@ def topological_sort(variable: Variable) -> Iterable[Variable]:
         Non-constant Variables in topological order starting from the right.
     """
     # TODO: Implement for Task 1.4.
-    raise NotImplementedError("Need to implement for Task 1.4")
+    result = []
+    visited = set()
+    def dfs(var: Variable):
+        if var.unique_id in visited or var.is_constant():
+            return
+        
+        visited.add(var.unique_id)
+        for parent in var.parents:
+            dfs(parent)
+        
+        result.append(var)
+
+    dfs(variable)
+    result.reverse()
+
+    return result
 
 
 def backpropagate(variable: Variable, deriv: Any) -> None:
@@ -77,7 +99,20 @@ def backpropagate(variable: Variable, deriv: Any) -> None:
     No return. Should write to its results to the derivative values of each leaf through `accumulate_derivative`.
     """
     # TODO: Implement for Task 1.4.
-    raise NotImplementedError("Need to implement for Task 1.4")
+    topo_order = topological_sort(variable)
+    gradients = {variable.unique_id: deriv}
+
+    for node in topo_order:
+        current_deriv = gradients.get(node.unique_id, 0.0)
+        if node.is_leaf():
+            node.accumulate_derivative(current_deriv)
+        
+        for parent, parent_derive in node.chain_rule(current_deriv):
+            if parent.unique_id in gradients:
+                gradients[parent.unique_id] += parent_derive
+            else:
+                gradients[parent.unique_id] = parent_derive
+
 
 
 @dataclass
